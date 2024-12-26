@@ -1,2 +1,2 @@
-# Assessment-of-Enzyme-Resource-Diversity-in-Marine-Microbiomes
+# Assessment of Enzyme Resource Diversity in Marine Microbiomes
 XXX
