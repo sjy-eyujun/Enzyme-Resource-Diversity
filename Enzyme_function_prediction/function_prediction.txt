@@ -1,0 +1,22 @@
+#1.CLEAN
+python CLEAN_infer_fasta.py --fasta_data 354_fa.fasta  
+
+#2.eggnog
+emapper.py --data_dir /mnt/user_group3/SUNJY/db/eggnog \
+      -i /mnt/user_group3/SUNJY/E_working/sea_mb/result/15w.fasta --cpu 3 -m diamond --override \
+      -o /mnt/user_group3/SUNJY/E_working/sea_mb/eggnog/output
+
+
+#3.KEGG
+#!/bin/bash
+j=0
+k=1
+for i in `find /mnt/user_group3/SUNJY/E_working/sea_mb/kegg `
+do
+        j=`expr $j + $k`
+        echo "$i"
+        echo "$j"
+        echo ${i##*/}
+       exec_annotation $i -o /mnt/user_group3/SUNJY/E_working/sea_mb/kegg${i##*/}.out -f detail --cpu 100 --ko_list ~/application/keggkoala/db_2024_09/ko_list --profile ~/application/keggkoala/db_2024_09/profiles/
+
+done

@@ -1,0 +1,87 @@
+#1、download
+ascp -i asperaweb_id_dsa.openssh -l 1000M -Q -T -P 33001 -k 1 --mode recv --host fasp.sra.ebi.ac.uk --user era-fasp --file-list fq_down.txt .
+
+#2、fastqc
+fastqc  /clusterfs/node9/lidandan/sea_mb/seq/*fastq.gz -o /clusterfs/node9/lidandan/sea_mb/temp/faqc/ -t 50 
+multiqc -d /clusterfs/node9/lidandan/sea_mb/temp/fastqc/ -o /clusterfs/node9/lidandan/sea_mb/temp/multiqc 
+
+#3、kneaddata
+tail -n+2 metadata.txt | cut -f1 | while read sample; do
+    time kneaddata -un /clusterfs/node9/lidandan/"${sample}.fastq.gz"  \
+    -o /clusterfs/node9/lidandan/sea_mb/temp/kneaddata/ -v -t 50 --remove-intermediate-output \
+    --trimmomatic /clusterfs/node9/lidandan/software/miniconda3/share/trimmomatic \
+    --trimmomatic-options 'ILLUMINACLIP:/clusterfs/node9/lidandan/software/miniconda3/share/trimmomatic-0.39-2/adapters-PE.fa:2:30:10 SLIDINGWINDOW:4:20 MINLEN:100' \
+    --reorder --bowtie2-options '--very-sensitive --dovetail' -db /clusterfs/node9/lidandan/db/kneaddata/human/     
+    /usr/bin/rm -rf /clusterfs/node9/lidandan/knbow"${sample}"*contam* /clusterfs/node9/lidandan/knbow/"${sample}"*unmatched*
+done
+
+#4.MEGAHIT
+tail -n+2 metadata.txt | cut -f1 | while read sample; do    
+  megahit -t 30 \
+    -1 /clusterfs/node9/lidandan/sea_mb/temp/kneaddata/"${sample}_1.fastq" \
+    -2 /clusterfs/node9/lidandan/sea_mb/temp/kneaddata/"${sample}_2.fastq" \
+    -o /clusterfs/node9/lidandan/sea_mb/temp/megahit/"${sample}" 
+     2>&1 | tee -a /clusterfs/node9/lidandan/sea_mb/temp/megahit/pawarn.txt
+done 
+
+##QUAST 
+
+
+#5.prodigal
+tail -n+2 metadata.txt | cut -f1 | while read sample; do
+     prodigal -i /clusterfs/node9/lidandan/sea_mb/result/megahit/"${sample}_final.contigs.fa" \
+        -d /clusterfs/node9/lidandan/sea_mb/temp/prodigal_contig/"${sample}_gene.fa" \
+        -o /clusterfs/node9/lidandan/sea_mb/temp/prodigal_contig/"${sample}_gene.gff" \
+        -p meta -f gff > /clusterfs/node9/lidandan/sea_mb/temp/prodigal_contig/"${sample}_gene.log" 2>&1 
+done >> warn.txt
+
+
+#6.cd-hit
+tail -n+2 metadata.txt | cut -f1 | while read sample; do
+     /clusterfs/node9/lidandan/software/miniconda3/envs/cd-hit/bin/cd-hit-est -i /clusterfs/node9/lidandan/sea_mb/temp/prodigal_contig/"${sample}_gene.fa" \
+        -o /clusterfs/node9/lidandan/sea_mb/temp/cd-hit_contig/"${sample}_nucleotide.fa" \
+        -aS 0.9 -c 0.95 -G 0 -g 0 -T 30 -M 0
+done
+
+
+
+#7.salmon
+tail -n+2 metadata.txt | cut -f1 | while read sample; do
+    salmon index -t /clusterfs/node9/lidandan/sea_mb/temp/cd-hit_contig/"${sample}_nucleotide.fa" \
+        -p 20 -i /clusterfs/node9/lidandan/sea_mb/temp/salmon_new/"index_${sample}"  
+        
+    salmon quant -i /clusterfs/node9/lidandan/sea_mb/temp/salmon_new/"index_${sample}" -l A -p 20 --meta \
+        -1 /clusterfs/node9/lidandan/sea_mb/temp/kneaddata/"${sample}_1.fastq" \
+        -2 /clusterfs/node9/lidandan/sea_mb/temp/kneaddata/"${sample}_2.fastq" \
+        -o /clusterfs/node9/lidandan/sea_mb/temp/salmon_new/"${sample}.quant" \
+        
+    salmon quantmerge --quants /clusterfs/node9/lidandan/sea_mb/temp/salmon_new/"${sample}.quant" \
+        -o /clusterfs/node9/lidandan/sea_mb/result/salmon_new/"${sample}.TPM"
+    salmon quantmerge --quants /clusterfs/node9/lidandan/sea_mb/temp/salmon_new/"${sample}.quant" \
+        --column NumReads -o /clusterfs/node9/lidandan/sea_mb/result/salmon_new/"${sample}.count"
+    sed -i '1 s/.quant//g' /clusterfs/node9/lidandan/sea_mb/result/salmon_new/*count
+    sed -i '1 s/.quant//g' /clusterfs/node9/lidandan/sea_mb/result/salmon_new/*TPM
+        2>&1 >> /clusterfs/node9/lidandan/sea_mb/temp/salmon_new/err3_.txt
+        
+done
+
+
+#8.mmseq2
+mmseqs createdb /clusterfs/node9/lidandan/sea_mb/result/NR_contig/sea_354.fasta /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/mmseqs_db/354_noanno 2>&1 | tee -a /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/warn_mm1.txt
+
+mmseqs cluster /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/mmseqs_db/354_noanno /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/mmseqs_out/354_noanno_clu tmp --min-seq-id 0.8 -c 0.8 --cov-mode 0 --cluster-mode 2 -e 0.001 --threads 100  2>&1 | tee -a /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/warn_mm2.txt
+
+mmseqs createtsv /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/mmseqs_db/354_noanno /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/mmseqs_db/354_noanno /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/mmseqs_out/354_noanno_clu /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/354_noanno_clu.tsv  2>&1 | tee -a /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/warn_mm3.txt
+
+mmseqs createsubdb /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/mmseqs_out/354_noanno_clu /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/mmseqs_db/354_noanno /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/mmseqs_rep/354_noanno_rep 2>&1 | tee -a /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/warn_mm4.txt
+
+mmseqs convert2fasta /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/mmseqs_rep/354_noanno_rep /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/354_noanno_rep.fasta 2>&1 | tee -a /clusterfs/node9/lidandan/sea_mb/temp/mmseq2/warn_mm5.txt
+
+
+#9.select clusters
+awk '/^>/ {if (seq_length > 100) print header"\n"seq; header=$0; seq=""; seq_length=0; next} {seq=seq $0; seq_length+=length($0)} END {if (seq_length > 100) print header"\n"seq}' clu10.fasta > clu10_length100.fasta
+
+
+
+
+

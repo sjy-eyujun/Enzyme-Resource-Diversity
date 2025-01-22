@@ -1,0 +1,1067 @@
+---
+title: "Assessment of enzyme resource diversity in marine microbiomes"
+format: html
+editor: Jingyu Sun
+---
+
+# DATA
+
+```{r}
+library(dplyr)
+library(aplot)
+library(tidyr)
+library(ggplot2)
+library(ggpubr)
+library(showtext)
+library(RColorBrewer)
+library(reshape2)
+library(ggbreak)
+library(ggforce)
+library(ggrepel)
+library(patchwork)
+library(ggstar)
+library(ggbeeswarm)
+library(ggradar)
+library(VennDiagram)
+library(UpSetR)
+library(ggsignif)
+library(svglite)
+library(viridis)
+library(leaps)
+library(car)
+library(vegan)
+```
+
+```{r}
+sample_table <- read.csv("F:/SDU/Eworking/one/life history/sample_table.csv")[,-1]
+sample_table <- sample_table %>%
+  mutate(
+    Temp = ifelse(Temp == 0, NA, Temp),
+    Salinity = ifelse(Salinity == 0, NA, Salinity),
+    Dissolved.oxygen = ifelse(Dissolved.oxygen == 0, NA, Dissolved.oxygen)
+  )
+sample_table$Ocean <- factor(sample_table$Ocean, levels = c("Antarctic_Ocean", "Arctic_Ocean", "Indian", "NAtlantic", "SAtlantic", "NPacific", "SPacific", "RS"))
+
+
+clu_table <- read.csv("F:/SDU/Eworking/one/life history/clu_table.csv")
+EC_table <- read.csv("F:/SDU/Eworking/one/life history/EC_table.csv")
+```
+
+```{r}
+sample_Salinity <- sample_table %>%
+  mutate(Salinity_tag = ntile(Salinity, 4))
+
+
+sample_Salinity$Salinity_tag <- factor(sample_Salinity$Salinity_tag, 
+                                    levels = 1:4, 
+                                    labels = c("Salinity_1", "Salinity_2", "Salinity_3", "Salinity_4"))
+sample_Salinity <- sample_Salinity %>% filter(Salinity_tag != "NA")
+
+
+sample_EPI <- sample_table %>% filter(Ocean.depth.layer == "Epipelagic")
+
+
+sample_temp5 <- sample_table %>% filter(Temp <= 5)
+```
+
+# Figure 1
+
+## 1a
+
+```{r}
+world<-map_data("world")
+FIG1A <- ggplot() +
+  geom_polygon(data = world, aes(x = long, y = lat, group = group), fill = "#dedede") +
+  geom_point(data = sample_table, aes(x = Longitude.Degrees.East, y = Latitude.Degrees.North, 
+                                      color = Ocean, fill = Ocean),
+             shape = 21, alpha = 0.6, stroke = 0.5, color = "black", size = 4) +
+  scale_color_manual(values = c("Antarctic_Ocean" ="#5dbfe9","Arctic_Ocean"="#0B3994","Indian"="#BE93C2","NAtlantic"="#BFDAA5","NPacific"="#F2BB1C","RS"="#AF2224","SAtlantic"="#7DB44C","SPacific"="#D48222"),
+                     breaks = c("Antarctic_Ocean","Arctic_Ocean","Indian","NAtlantic","NPacific","RS","SAtlantic","SPacific")) +
+  scale_fill_manual(values = c("Antarctic_Ocean" ="#5dbfe9","Arctic_Ocean"="#0B3994","Indian"="#BE93C2","NAtlantic"="#BFDAA5","NPacific"="#F2BB1C","RS"="#AF2224","SAtlantic"="#7DB44C","SPacific"="#D48222")) +  # 填充色
+  xlab("Longitude") + ylab("Latitude") +
+  theme_bw() +
+  theme(
+    text = element_text(size = 14, family = "sans", face = "plain"),
+    panel.background = element_rect(color = "black", fill = "transparent"),
+    legend.position = "right"
+  ) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text = element_text(size = 14),
+    panel.border = element_blank(),
+    panel.background = element_rect(fill = "white", color = NA), 
+    plot.background = element_rect(fill = "white", color = NA),   
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank()  
+  )
+
+```
+
+## 1b
+
+```{r}
+FIG1B <- ggplot(sample_table, aes(x = Ocean, y = ec_number, fill = Ocean)) +
+  geom_boxplot(color = "black", outlier.shape = NA, alpha = 1) +  
+  geom_jitter(color = "grey", width = 0.2, alpha = 0.7, size = 1) + 
+  labs(title = "", x = "", y = "EC_number") +
+  theme_minimal() +
+  scale_fill_manual(
+    values = c("Antarctic_Ocean" ="#5dbfe9","Arctic_Ocean"="#0B3994","Indian"="#BE93C2","NAtlantic"="#BFDAA5","NPacific"="#F2BB1C","RS"="#AF2224","SAtlantic"="#7DB44C","SPacific"="#D48222"),
+    name = "Ocean" ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+    plot.title = element_text(size = 7, face = "bold"),
+    axis.title.x = element_text(size = 7),
+    axis.title.y = element_text(size = 7),
+    axis.text = element_text(size = 7),
+    legend.title = element_text(size = 7),
+    legend.text = element_text(size = 7),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+    panel.background = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA), 
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank()  
+  ) +
+  theme(legend.position = "none") +
+  theme(axis.line = element_line(color = "black"))
+
+```
+
+## 1c
+
+```{r}
+FIG1C <- ggplot(sample_Salinity, aes(x = Salinity_tag, y = ec_number, fill = Salinity_tag)) +
+  geom_boxplot(color = "black", outlier.shape = NA, alpha = 1) + 
+  geom_jitter(color = "grey", width = 0.2, alpha = 0.2, size = 1) + 
+  labs(title = "", x = "", y = "EC_number") +
+  theme_minimal() +
+  ggpubr::stat_compare_means(comparisons = list( c("Salinity_1", "Salinity_2"),c("Salinity_2", "Salinity_3"), c("Salinity_3", "Salinity_4")), method = "wilcox.test") +
+  scale_fill_manual(
+    values = c("#C2DCBF","#BAD8FB","#FEE5D8","#E7D8FA"),
+    name = "Salinity_tag" ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+    plot.title = element_text(size = 7, face = "bold"),
+    axis.title.x = element_text(size = 7),
+    axis.title.y = element_text(size = 7),
+    axis.text = element_text(size = 7),
+    legend.title = element_text(size = 7),
+    legend.text = element_text(size = 7),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+    panel.background = element_rect(fill = "white", color = NA),  # Set panel background to white
+    plot.background = element_rect(fill = "white", color = NA),   # Set plot background to white
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank() 
+  ) +
+  theme(legend.position = "none") +
+  theme(panel.border = element_rect(color = "black", size = 1))
+```
+
+## 1d
+
+```{r}
+cor.test(sample_EPI$Temp,sample_EPI$ec_number,data=sample_EPI,         
+         alternative = "two.sided",         
+         method ="pearson",
+         conf.level=0.95)
+FIG1D <- ggplot(sample_EPI, aes(x = Temp, y = ec_number, color = Ocean)) +
+  geom_point(alpha = 0.6, size = 2, stroke = 0) +  
+  geom_smooth(method = "lm", se = TRUE, color = "black", fill = "grey") +  
+  labs(x = "Temp(deg.℃)", y = "ec_number", title = " sample_EPI$Temp") +
+  theme_minimal() +
+  geom_rug(show.legend = F) +
+  scale_color_manual(
+    values = c("Antarctic_Ocean" = "#5dbfe9", "Arctic_Ocean" = "#0B3994", "Indian" = "#BE93C2", 
+               "NAtlantic" = "#BFDAA5", "NPacific" = "#F2BB1C", "RS" = "#AF2224", 
+               "SAtlantic" = "#7DB44C", "SPacific" = "#D48222"),
+    name = "Ocean"
+  ) +
+  theme(
+    plot.title = element_text(size = 7, face = "bold"),
+    axis.title.x = element_text(size = 7),
+    axis.title.y = element_text(size = 7),
+    axis.text = element_text(size = 7),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.5) , 
+    panel.background = element_blank(),  
+    plot.background = element_rect(fill = "white", color = NA), 
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank() 
+  ) +
+  theme( axis.line = element_line(color = "black"), 
+    legend.position = "none")
+```
+
+## 1e
+
+```{r}
+cor.test(sample_temp5$depth,sample_temp5$ec_number,data=sample_temp5,         
+         alternative = "two.sided",         
+         method ="pearson",
+         conf.level=0.95)
+
+FIG1E <- ggplot(sample_temp5, aes(x = depth, y = ec_number, color = Ocean)) +
+  geom_point(alpha = 0.6, size = 2, stroke = 0) +  
+  geom_smooth(method = "lm", se = TRUE, color = "black", fill = "grey") +  
+  labs(x = "depth", y = "ec_number", title = " sample_temp5$depth") +
+  theme_minimal() +
+  geom_rug(show.legend = F) +
+  scale_color_manual(
+    values = c("Antarctic_Ocean" = "#5dbfe9", "Arctic_Ocean" = "#0B3994", "Indian" = "#BE93C2", 
+               "NAtlantic" = "#BFDAA5", "NPacific" = "#F2BB1C", "RS" = "#AF2224", 
+               "SAtlantic" = "#7DB44C", "SPacific" = "#D48222"),
+    name = "Ocean"
+  ) +
+  theme(
+    plot.title = element_text(size = 7, face = "bold"),
+    axis.title.x = element_text(size = 7),
+    axis.title.y = element_text(size = 7),
+    axis.text = element_text(size = 7),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.5) ,  
+    panel.background = element_blank(),  
+    plot.background = element_rect(fill = "white", color = NA),  
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank()   
+  ) +
+  theme( axis.line = element_line(color = "black"),  
+    legend.position = "none")
+```
+
+# Figure 2
+
+## 2a
+
+```{r}
+EC_summary <- read.csv("F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/EC_summary.csv")
+FIG2A_1 <- ggplot(EC_summary[EC_summary$variable == "novel_clusters_number",], aes(
+  x = EC_id, 
+  y = value,
+  fill = variable)) +
+  geom_bar(stat = 'identity') +
+  geom_text(aes(label = value, fill = NULL),
+            vjust = -1.2, size = 4, color = "black") +
+  scale_fill_manual(values = c("#D06D60")) +
+  labs(y = "novel clusters") +
+  theme_classic() +
+  theme(axis.title.x = element_blank(),
+        panel.grid = element_blank(),
+        strip.background.x = element_rect(
+          color = "white", fill = "white", size = 1.5, linetype = "solid"),
+        strip.placement = "outside",
+        axis.text.y = element_blank(),
+        axis.text.x = element_text(hjust = .55),
+        axis.ticks.y = element_blank(),
+        legend.title = element_blank(),
+        legend.position = "none",
+        plot.margin = grid::unit(c(0, 0, 0, 0), "pt") )
+
+FIG2A_2 <- ggplot(EC_summary[EC_summary$variable == "novel_clusters_pro",], aes(
+  x = EC_id, 
+  y = -value,  
+  fill = variable)) +
+  geom_bar(stat = 'identity') +
+  geom_text(aes(label = value, fill = NULL),  
+            vjust = 1.2, size = 4, color = "black") +
+  scale_fill_manual(values = c("#708FBA")) +
+  scale_x_discrete(position = "top") +
+  labs(y = "novel clusters (%)") +
+  theme_classic() +
+  theme(axis.title.x = element_blank(),
+        panel.grid = element_blank(),
+        strip.background.x = element_rect(
+          color = "white", fill = "white", size = 1.5, linetype = "solid"),
+        strip.placement = "outside",
+        axis.text.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.title = element_blank(),
+        legend.position = "none",
+        plot.margin = grid::unit(c(0, 0, 0, 0), "pt")  # Use grid::unit() for margins
+  )
+
+require(patchwork)
+FIG2A <- FIG2A_1/FIG2A_2
+FIG2A
+
+ggsave(FIG2A,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/图2/FIG2A.pdf", width =3, height = 4,units = "in",dpi = 600 )
+```
+
+## 2b
+
+```{r}
+clu_kegg_table <- read.csv("clu_kegg_table.csv")[,c(2,8,9,11,16)]
+data_1b <- clu_kegg_table %>%distinct(ref_clu, .keep_all = TRUE)
+
+cog_categories <- unique(data_1b$ref_clu[data_1c$COG_category != "-"])
+pfam_values <- unique(data_1b$ref_clu[data_1c$PFAMs != "-"])
+ko_values <- unique(data_1b$ref_clu[data_1c$KO != "-"])
+unknow_family <- unique(data_1b$ref_clu[data_1c$family_know == "unknow"])
+
+venn.diagram(
+  x = list(COG = cog_categories, PFAM = pfam_values, KO = ko_values, Unknow = unknow_family),
+  category.names = c("COG", "PFAMs", "KO", "Most Wanted Clusters"),
+  filename =filename,
+  output = TRUE,
+  fill = c("#8DD3C7", "#FFFFB3", "#BEBADA", "#FB8072"),
+  alpha = 0.5,
+  cat.cex = 1.5,
+  cat.fontface = "bold",
+  cat.col = c("black","black","black","black")
+) 
+```
+
+## 2c
+
+```{r}
+sample_table$new_member <- sample_table$sample_all_member-sample_table$sample_know_member
+sample_table$new_member_pro <- sample_table$new_member/sample_table$sample_all_member *100
+
+
+all_samples_summary <- data.frame(
+  Ocean = "All_Samples",  
+  new_member_pro = sample_table$new_member_pro,
+  new_clu_pro = sample_table$new_clu_pro,
+  family_unknow_pro = sample_table$family_unknow_pro,
+  family_unknow_member_pro = sample_table$family_unknow_member_pro
+)
+```
+
+```{r}
+FIG2C_1 <- ggplot(sample_table, aes(y = Ocean, x = new_member_pro, fill = Ocean)) +
+  geom_boxplot(color = "black", outlier.shape = NA, alpha = 1) +  
+  geom_boxplot(data = all_samples_summary, 
+               aes(y = Ocean, x = new_member_pro), 
+               color = "black", 
+               fill = "#cce4ef",  
+               alpha = 1) + 
+  labs(title = "", x = "new_member_pro", y = "") +
+  theme_minimal() +
+  scale_fill_manual(
+    values = c("Antarctic_Ocean" ="#5dbfe9","Arctic_Ocean"="#0B3994","Indian"="#BE93C2","NAtlantic"="#BFDAA5","NPacific"="#F2BB1C","RS"="#AF2224","SAtlantic"="#7DB44C","SPacific"="#D48222"),
+    name = "Ocean" 
+  ) +
+  scale_x_reverse() +
+  theme(
+    axis.text.y = element_text(angle = 0, hjust = 1, size = 10),  
+    plot.title = element_text(size = 10, face = "bold"),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+    panel.background = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  theme(legend.position = "none") +
+  theme(axis.line = element_line(color = "black"))
+
+```
+
+```{r}
+FIG2C_2 <- ggplot(sample_table, aes(y = Ocean, x = new_clu_pro, fill = Ocean)) +
+  geom_boxplot(color = "black", outlier.shape = NA, alpha = 1) +  
+  geom_boxplot(data = all_samples_summary, 
+               aes(y = Ocean, x = new_clu_pro), 
+               color = "black", 
+               fill = "#cce4ef",
+               alpha = 1) + 
+  labs(title = "", x = "new_clu_pro", y = "") +
+  theme_minimal() +
+  scale_fill_manual(
+    values = c("Antarctic_Ocean" ="#5dbfe9","Arctic_Ocean"="#0B3994","Indian"="#BE93C2","NAtlantic"="#BFDAA5","NPacific"="#F2BB1C","RS"="#AF2224","SAtlantic"="#7DB44C","SPacific"="#D48222"),
+    name = "Ocean" 
+  ) +
+  theme(
+    axis.text.y = element_text(angle = 0, hjust = 1, size = 10),  # Adjust text angle for the y-axis
+    plot.title = element_text(size = 10, face = "bold"),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+    panel.background = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  theme(legend.position = "none") +
+  theme(axis.line = element_line(color = "black"))
+
+FIG2C <- FIG2C_1+FIG2C_2
+
+ggsave(FIG2C,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/图2/FIG2C.pdf", width =10, height = 7,units = "in",dpi = 600 )
+```
+
+## 2d-clu_member
+
+```{r}
+quantiles_member_10 <- c(quantile(clu_table$clu_member_number, probs = seq(0, 1, by = 0.1)))
+
+ranges_member <- list(
+  "1-6" = c(1, 7),               # 0% - 10%
+  "7-10" = c(7, 11),             # 10% - 20%
+  "11-13" = c(11, 14),           # 20% - 30%
+  "14-18" = c(14, 19),           # 30% - 40%
+  "19-26" = c(19, 27),           # 40% - 50%
+  "27-40" = c(27, 41),           # 50% - 60%
+  "41-68" = c(41, 69),           # 60% - 70%
+  "69-138" = c(69, 139),         # 70% - 80%
+  "139-380" = c(139, 381),       # 80% - 90%
+  "381-20782" = c(381, 20782)    # 90% - 100%
+)
+
+
+all_clu_member <- clu_table[, c(1, 6)]  
+unknow_clu_member <- clu_table[, c(1, 5, 6)] %>% filter(if_know == "unknow")  
+colnames(unknow_clu_member)[3] <- "unknow_clu_member_number"
+
+range_unknow_member <- data.frame(
+  Range = names(ranges_member),
+  number_unknow_member = sapply(names(ranges_member), function(range_member) {
+    range_limits <- ranges_member[[range_member]]
+    if (range_member != "381-20782") {  
+      number <- unknow_clu_member %>%
+        filter(unknow_clu_member_number >= range_limits[1] & 
+               unknow_clu_member_number < range_limits[2]) %>%
+        nrow()
+    } else { 
+      number <- unknow_clu_member %>%
+        filter(unknow_clu_member_number >= range_limits[1] & 
+               unknow_clu_member_number <= range_limits[2]) %>%
+        nrow()
+    }
+    round(number, 2)
+  }),
+  stringsAsFactors = FALSE
+)
+
+
+range_all_member <- data.frame(
+  Range = names(ranges_member),
+  number_all_member = sapply(names(ranges_member), function(range_member) {
+    range_limits <- ranges_member[[range_member]]
+    if (range_member != "381-20782") {  
+      number <- all_clu_member %>%
+        filter(clu_member_number >= range_limits[1] & clu_member_number < range_limits[2]) %>%
+        nrow()
+    } else {  
+      number <- all_clu_member %>%
+        filter(clu_member_number >= range_limits[1] & clu_member_number <= range_limits[2]) %>%
+        nrow()
+    }
+    round(number, 2)
+  }),
+  stringsAsFactors = FALSE
+)
+
+
+range_pre_member <- merge(range_all_member, range_unknow_member, by = "Range")
+range_pre_member <- range_pre_member[match(range_all_member$Range, range_pre_member$Range), ]
+range_pre_member$pro <- range_pre_member$number_unknow_member / range_pre_member$number_all_member * 100
+range_pre_member$Range <- factor(range_pre_member$Range, levels = range_pre_member$Range)
+range_pre_member$Range_lever <- seq_along(range_pre_member$Range)
+
+
+FIG2D <- ggplot(range_pre_member, aes(x = Range_lever, y = pro)) +
+  geom_point(color = "#708FBA", size = 3) +
+  geom_segment(aes(x = Range_lever, xend = Range_lever, y = 0, yend = pro), color = "grey", size = 1) +
+  labs(x = "Cluster members' range", y = "novelty rate (%)") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 1, size = 10),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    legend.position = "none", 
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  scale_x_continuous(breaks = 1:10) +
+  coord_cartesian(ylim = c(60, 100))
+
+
+ggsave(FIG2D,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/图2/FIG2D.pdf", width =3, height = 4,units = "in",dpi = 600 )
+```
+
+## 2e-sample
+
+```{r}
+quantiles_sample_10 <- c(quantile(clu_table$sample_number, probs = seq(0, 1, by = 0.1)))
+
+ranges_sample <- list(
+  "1-6" = c(1, 6),                # 0% - 10%
+  "7-9" = c(7, 9),                # 10% - 20%
+  "10-12" = c(10, 12),            # 20% - 30%
+  "13-15" = c(13, 15),            # 30% - 40%
+  "16-21" = c(16, 21),            # 40% - 50%
+  "22-30" = c(22, 30),            # 50% - 60%
+  "31-45" = c(31, 45),            # 60% - 70%
+  "46-75" = c(46, 75),            # 70% - 80%
+  "76-142" = c(76, 142),          # 80% - 90%
+  "143-345" = c(143, 345)         # 90% - 100%
+)
+
+all_sample_member <- clu_table[, c(1, 9)]  
+
+unknow_sample_member <- clu_table[, c(1, 5, 9)] %>% filter(if_know == "unknow")  
+colnames(unknow_sample_member)[3] <- "unknow_sample_member_number"
+
+range_unknow_sample <- data.frame(
+  Range = names(ranges_sample),
+  number_unknow_sample = sapply(names(ranges_sample), function(range_member) {
+    range_limits <- ranges_sample[[range_member]]
+    number <- unknow_sample_member %>%
+      filter(unknow_sample_member_number >= range_limits[1] & 
+             unknow_sample_member_number <= range_limits[2]) %>%
+      nrow()
+    round(number, 2)
+  }),
+  stringsAsFactors = FALSE
+)
+
+range_all_sample <- data.frame(
+  Range = names(ranges_sample),
+  number_all_sample = sapply(names(ranges_sample), function(range_member) {
+    range_limits <- ranges_sample[[range_member]]
+    number <- all_sample_member %>%
+      filter(sample_number >= range_limits[1] & sample_number <= range_limits[2]) %>%
+      nrow()
+    round(number, 2)
+  }),
+  stringsAsFactors = FALSE
+)
+
+range_pre_sample <- merge(range_all_sample, range_unknow_sample, by = "Range")
+range_pre_sample <- range_pre_sample[match(range_all_sample$Range, range_pre_sample$Range), ]
+range_pre_sample$pro <- range_pre_sample$number_unknow_sample / range_pre_sample$number_all_sample * 100
+range_pre_sample$Range <- factor(range_pre_sample$Range, levels = range_pre_sample$Range)
+range_pre_sample$Range_lever <- seq_along(range_pre_sample$Range)
+
+
+FIG2E <- ggplot(range_pre_sample, aes(x = Range_lever, y = pro)) +
+  geom_point(color = "#708FBA", size = 3) +
+  geom_segment(aes(x = Range_lever, xend = Range_lever, y = 0, yend = pro), color = "gray", size = 1) +
+  labs(x = "Sample range", y = "novelty rate (%)") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 1, size = 10),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    legend.position = "none", 
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  scale_x_continuous(breaks = 1:10) +
+  coord_cartesian(ylim = c(60, 100))
+
+
+ggsave(FIG2E,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/图2/FIG2E.pdf", width =3, height = 4,units = "in",dpi = 600 )
+```
+
+## 2f-TPM
+
+```{r}
+quantiles_tpm_10 <- c(quantile(clu_table$all_clu_TPM, probs = seq(0, 1, by = 0.1)))
+ranges_tpm <- list(
+  "0-2.36" = c(quantiles_tpm_10[1], quantiles_tpm_10[2]),
+  "2.36-4.74" = c(quantiles_tpm_10[2], quantiles_tpm_10[3]),
+  "4.74-7.73" = c(quantiles_tpm_10[3], quantiles_tpm_10[4]),
+  "7.73-12.23" = c(quantiles_tpm_10[4], quantiles_tpm_10[5]),
+  "12.23-19.50" = c(quantiles_tpm_10[5], quantiles_tpm_10[6]),
+  "19.50-32.85" = c(quantiles_tpm_10[6], quantiles_tpm_10[7]),
+  "32.85-60.33" = c(quantiles_tpm_10[7], quantiles_tpm_10[8]),
+  "60.33-132.01" = c(quantiles_tpm_10[8], quantiles_tpm_10[9]),
+  "132.01-397.54" = c(quantiles_tpm_10[9], quantiles_tpm_10[10]),
+  "397.54-137285.60" = c(quantiles_tpm_10[10], quantiles_tpm_10[11])
+)
+
+all_clu_TPM <- clu_table[,c(1,15)]
+unknow_clu_TPM <- clu_table[,c(1,5,15)] %>% filter(if_know=="unknow")
+colnames(unknow_clu_TPM)[3] <- "unknow_clu_TPM"
+
+range_unknow_clu_TPM <- data.frame(
+  Range = names(ranges_tpm),
+  number_unknow_clu_TPM = sapply(names(ranges_tpm), function(range_tpm) {
+    number <- unknow_clu_TPM %>%
+      filter(unknow_clu_TPM >= ranges_tpm[[range_tpm]][1] & unknow_clu_TPM <= ranges_tpm[[range_tpm]][2]) %>%
+      nrow()
+    round(number, 2)
+  }),
+  stringsAsFactors = FALSE
+)
+
+range_all_clu_TPM <- data.frame(
+  Range = names(ranges_tpm),
+  number_all_clu_TPM = sapply(names(ranges_tpm), function(range_tpm) {
+    number <- all_clu_TPM %>%
+      filter(all_clu_TPM >= ranges_tpm[[range_tpm]][1] & all_clu_TPM <= ranges_tpm[[range_tpm]][2]) %>%
+      nrow()
+    round(number, 2)
+  }),
+  stringsAsFactors = FALSE
+)
+
+range_pre_TPM <- merge(range_all_clu_TPM,range_unknow_clu_TPM,by="Range")
+range_pre_TPM <- range_pre_TPM[match(range_all_clu_TPM$Range, range_pre_TPM$Range), ]
+range_pre_TPM$pro <- range_pre_TPM$number_unknow_clu_TPM/range_pre_TPM$number_all_clu_TPM*100
+range_pre_TPM$Range <- factor(range_pre_TPM$Range, levels = range_pre_TPM$Range)
+range_pre_TPM$Range_lever <- c(1,2,3,4,5,6,7,8,9,10)
+
+FIG2F <- ggplot(range_pre_TPM, aes(x = Range_lever, y = pro)) +
+  geom_point(color = "#708FBA", size = 3) +
+  geom_segment(aes(x = Range_lever, xend = Range_lever, y = 0, yend = pro), color = "gray", size = 1) +
+  labs(x = "Cluster TPM's Range", y = "novelty rate (%)") +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 0, hjust = 1, size = 10),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    legend.position = "none", 
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+    panel.background = element_rect(fill = "white", color = NA),
+    plot.background = element_rect(fill = "white", color = NA), 
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank()
+  ) +
+  scale_x_continuous(breaks = 1:10) +
+  coord_cartesian(ylim = c(60, 100))
+
+
+ggsave(FIG2F,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/图2/FIG2F.pdf", width =3, height = 4,units = "in",dpi = 600 )
+```
+
+## 2g
+
+```{r}
+library(ggplot2)
+library(scales)
+random_novel <- read.csv("F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/R作图/random_novel_15w_clu_method2.csv")
+
+fit_results <- lm(log(unknown_counts) ~ log(sample_number), data = random_novel)
+alpha <- coef(fit_results)[2]  
+k <- exp(coef(fit_results)[1])  
+heap_fit <- k * random_novel$sample_number^alpha
+random_novel$heap_fit <- heap_fit
+
+mean_unknown_counts <- aggregate(unknown_counts ~ sample_number, data = random_novel, mean)
+mean_unknown_ratios <- aggregate(unknown_ratios ~ sample_number, data = random_novel, mean)
+
+threshold <- quantile(random_novel$sample_number, 0.9)
+stable_data <- random_novel %>%
+  filter(sample_number > threshold)
+stable_summary <- stable_data %>%
+  summarize(
+    mean_ratio = mean(unknown_ratios),
+    se_ratio = sd(unknown_ratios) / sqrt(n())
+  )
+
+FIG2G <- ggplot(random_novel, aes(x = sample_number, y = unknown_ratios)) +
+  geom_line(aes(group = iteration), color = "gray", alpha = 0.3) +
+  geom_line(data = mean_unknown_ratios, aes(x = sample_number, y = unknown_ratios), color = "#708FBA", linewidth = 1) +
+  theme_minimal() +
+  labs(title = "",
+       x = "Sample ", 
+       y = "novelty rate (%)") +
+  theme(legend.position = "none") +
+  scale_y_continuous(labels = label_comma()) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size =14),
+    axis.text = element_text(size = 14),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.5) ,  
+    panel.background = element_blank(),  
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank()  
+  ) +
+  theme( axis.line = element_line(color = "black"), 
+    legend.position = "none")
+
+#ggsave(FIG2G,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/图2/FIG2G.pdf", width =5, height = 4,units = "in",dpi = 600 )
+```
+
+# S1
+
+```{r}
+SFIG_1_1 <- ggplot(sample_table, aes(x = Ocean, y = sample_all_clu, fill = Ocean)) +
+  geom_boxplot(color = "black", outlier.shape = NA, alpha = 1) +  
+  geom_jitter(color = "grey", width = 0.2, alpha = 0.2, size = 1) + 
+  labs(title = "", x = "", y = "Clusters") +
+  theme_minimal() +
+  ggpubr::stat_compare_means(comparisons = list(c("Epipelagic", "Bathypelagic"), c("Epipelagic", "Mesopelagic"), c("Bathypelagic", "Mesopelagic")), method = "wilcox.test") +
+  scale_fill_manual(
+    values = c("Antarctic_Ocean" ="#5dbfe9","Arctic_Ocean"="#0B3994","Indian"="#BE93C2","NAtlantic"="#BFDAA5","NPacific"="#F2BB1C","RS"="#AF2224","SAtlantic"="#7DB44C","SPacific"="#D48222"),
+    name = "Ocean" ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+    plot.title = element_text(size = 7, face = "bold"),
+    axis.title.x = element_text(size = 7),
+    axis.title.y = element_text(size = 7),
+    axis.text = element_text(size = 7),
+    legend.title = element_text(size = 7),
+    legend.text = element_text(size = 7),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),  
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank()   
+  ) +
+  theme(legend.position = "none") +
+  theme(axis.line = element_line(color = "black"))
+
+ggsave(SFIG_1_1,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_1_1.tif", width =7, height = 4.5,units = "in",dpi = 600 )
+ggsave(SFIG_1_1,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_1_1.pdf", width =7, height = 4.5,units = "in",dpi = 600 )
+```
+
+```{r}
+SFIG_1_2 <- ggplot(sample_table, aes(x = Ocean, y = sample_all_member, fill = Ocean)) +
+  geom_boxplot(color = "black", outlier.shape = NA, alpha = 1) + 
+  geom_jitter(color = "grey", width = 0.2, alpha = 0.2, size = 1) +  
+  labs(title = "", x = "", y = "Members") +
+  theme_minimal() +
+  scale_fill_manual(
+    values = c("Antarctic_Ocean" ="#5dbfe9","Arctic_Ocean"="#0B3994","Indian"="#BE93C2","NAtlantic"="#BFDAA5","NPacific"="#F2BB1C","RS"="#AF2224","SAtlantic"="#7DB44C","SPacific"="#D48222"),
+    name = "Ocean" ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 7),
+    plot.title = element_text(size = 7, face = "bold"),
+    axis.title.x = element_text(size = 7),
+    axis.title.y = element_text(size = 7),
+    axis.text = element_text(size = 7),
+    legend.title = element_text(size = 7),
+    legend.text = element_text(size = 7),
+    panel.border = element_blank(),
+    panel.background = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),  
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank()   
+  ) +
+  theme(legend.position = "none") +
+  theme(axis.line = element_line(color = "black"))+
+  coord_cartesian(ylim = c(0, 350000))
+
+ggsave(SFIG_1_2,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_1_2.tif", width =7, height = 4.5,units = "in",dpi = 600 )
+ggsave(SFIG_1_2,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_1_2.pdf", width =7, height = 4.5,units = "in",dpi = 600 )
+```
+
+# S2
+
+```{r}
+SFIG_2_1 <- ggplot(sample_Salinity, aes(x = Salinity_tag, y = sample_all_clu, fill = Salinity_tag)) +
+  geom_boxplot(color = "black", outlier.shape = NA, alpha = 1) +  
+  geom_jitter(color = "grey", width = 0.2, alpha = 0.2, size = 1) + 
+  labs(title = "", x = "", y = "sample_all_clu") +
+  theme_minimal() +
+  ggpubr::stat_compare_means(comparisons = list( c("Salinity_3", "Salinity_4"),c("Salinity_2", "Salinity_3"), c("Salinity_1", "Salinity_2")), method = "wilcox.test") +
+  scale_fill_manual(
+    values = c("#C2DCBF","#BAD8FB","#FEE5D8","#E7D8FA"),
+    name = "Salinity_tag" ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 13),
+    plot.title = element_text(size = 13, face = "bold"),
+    axis.title.x = element_text(size = 13),
+    axis.title.y = element_text(size = 13),
+    axis.text = element_text(size = 13),
+    legend.title = element_text(size = 13),
+    legend.text = element_text(size = 13),
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+    panel.background = element_rect(fill = "white", color = NA),  
+    plot.background = element_rect(fill = "white", color = NA),   
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank()   
+  ) +
+  theme(legend.position = "none") +
+  theme(panel.border = element_rect(color = "black", size = 1))
++
+  coord_cartesian(ylim = c(0, 350000))
+
+ggsave(SFIG_2_1,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_2_1.tif", width =4, height = 5,units = "in",dpi = 600 )
+ggsave(SFIG_2_1,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_2_1.pdf", width =4, height = 5,units = "in",dpi = 600 )
+```
+
+```{r}
+SFIG_2_2 <- ggplot(sample_Salinity, aes(x = Salinity_tag, y = sample_all_member, fill = Salinity_tag)) +
+  geom_boxplot(color = "black", outlier.shape = NA, alpha = 1) +  
+  geom_jitter(color = "grey", width = 0.2, alpha = 0.2, size = 1) +  
+  labs(title = "", x = "", y = "sample_all_member") +
+  theme_minimal() +
+  ggpubr::stat_compare_means(comparisons = list( c("Salinity_3", "Salinity_4"),c("Salinity_2", "Salinity_3"), c("Salinity_1", "Salinity_2")), method = "wilcox.test") +
+  scale_fill_manual(
+    values = c("#C2DCBF","#BAD8FB","#FEE5D8","#E7D8FA"),
+    name = "Salinity_tag" ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 13),
+    plot.title = element_text(size = 13, face = "bold"),
+    axis.title.x = element_text(size = 13),
+    axis.title.y = element_text(size = 13),
+    axis.text = element_text(size = 13),
+    legend.title = element_text(size = 13),
+    legend.text = element_text(size = 13),
+    panel.border = element_rect(color = "black", fill = NA, size = 1),
+    panel.background = element_rect(fill = "white", color = NA),  
+    plot.background = element_rect(fill = "white", color = NA),  
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank()   
+  ) +
+  theme(legend.position = "none") +
+  theme(panel.border = element_rect(color = "black", size = 1))+
+  coord_cartesian(ylim = c(0, 350000))
+
+ggsave(SFIG_2_2,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_2_2-1.tif", width =4, height = 5,units = "in",dpi = 600 )
+ggsave(SFIG_2_2,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_2_2-1.pdf", width =4, height = 5,units = "in",dpi = 600 )
+```
+
+# S3
+
+```{r}
+cor.test(sample_EPI$Temp,sample_EPI$sample_all_clu,data=sample_EPI,         
+         alternative = "two.sided",         
+         method ="pearson",
+         conf.level=0.95)
+SFIG_3_1 <- ggplot(sample_EPI, aes(x = Temp, y = sample_all_clu, color = Ocean)) +
+  geom_point(alpha = 0.6, size = 3, stroke = 0) + 
+  geom_smooth(method = "lm", se = TRUE, color = "black", fill = "grey") + 
+  labs(x = "Temp(deg.℃)", y = "sample_all_clu", title = " sample_EPI$Temp") +
+  theme_minimal() +
+  geom_rug(show.legend = F) +
+  scale_color_manual(
+    values = c("Antarctic_Ocean" = "#1B6EB7", "Arctic_Ocean" = "#0B3994", "Indian" = "#BE93C2", 
+               "NAtlantic" = "#BFDAA5", "NPacific" = "#F2BB1C", "RS" = "#AF2224", 
+               "SAtlantic" = "#7DB44C", "SPacific" = "#D48222"),
+    name = "Ocean"
+  ) +
+  theme(
+    plot.title = element_text(size = 13, face = "bold"),
+    axis.title.x = element_text(size = 13),
+    axis.title.y = element_text(size = 13),
+    axis.text = element_text(size = 13),
+    panel.border = element_blank(), 
+    panel.background = element_blank(), 
+    plot.background = element_rect(fill = "white", color = NA),  
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank()  
+  ) +
+  theme( axis.line = element_line(color = "black"),  
+    legend.position = "none")
+
+ggsave(SFIG_3_1,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_3_1.tif", width =3, height = 4,units = "in",dpi = 600 )
+ggsave(SFIG_3_1,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_3_1.pdf", width =3, height = 4,units = "in",dpi = 600 )
+```
+
+```{r}
+cor.test(sample_EPI$Temp,sample_EPI$sample_all_member,data=sample_EPI,         
+         alternative = "two.sided",         
+         method ="pearson",
+         conf.level=0.95)
+SFIG_3_2 <- ggplot(sample_EPI, aes(x = Temp, y = sample_all_member, color = Ocean)) +
+  geom_point(alpha = 0.6, size = 3, stroke = 0) +  
+  geom_smooth(method = "lm", se = TRUE, color = "black", fill = "grey") +  
+  labs(x = "Temp(deg.℃)", y = "sample_all_member", title = " sample_EPI$Temp") +
+  theme_minimal() +
+  geom_rug(show.legend = F) +
+  scale_color_manual(
+    values = c("Antarctic_Ocean" = "#1B6EB7", "Arctic_Ocean" = "#0B3994", "Indian" = "#BE93C2", 
+               "NAtlantic" = "#BFDAA5", "NPacific" = "#F2BB1C", "RS" = "#AF2224", 
+               "SAtlantic" = "#7DB44C", "SPacific" = "#D48222"),
+    name = "Ocean"
+  ) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text = element_text(size = 14),
+    panel.border = element_blank(),  
+    panel.background = element_blank(), 
+    plot.background = element_rect(fill = "white", color = NA),   
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank()   
+  ) +
+  theme( axis.line = element_line(color = "black"),  
+    legend.position = "none")
+
+ggsave(SFIG_3_2,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_3_2.tif", width =3, height = 4,units = "in",dpi = 600 )
+ggsave(SFIG_3_2,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_3_2.pdf", width =3, height = 4,units = "in",dpi = 600 )
+```
+
+# S4
+
+```{r}
+cor.test(sample_temp5$depth,sample_temp5$sample_all_clu,data=sample_temp5,         
+         alternative = "two.sided",         
+         method ="pearson",
+         conf.level=0.95)
+SFIG_4_1 <- ggplot(sample_temp5, aes(x = depth, y = sample_all_clu, color = Ocean)) +
+  geom_point(alpha = 0.6, size = 3, stroke = 0) +  
+  geom_smooth(method = "lm", se = TRUE, color = "black", fill = "grey") + 
+  labs(x = "depth", y = "sample_all_clu",title = " sample_temp5$depth") +
+  theme_minimal()+
+  geom_rug( show.legend = F)+
+    scale_color_manual(
+    values = c("Antarctic_Ocean" = "#1B6EB7", "Arctic_Ocean" = "#0B3994", "Indian" = "#BE93C2", 
+               "NAtlantic" = "#BFDAA5", "NPacific" = "#F2BB1C", "RS" = "#AF2224", 
+               "SAtlantic" = "#7DB44C", "SPacific" = "#D48222"),
+    name = "Ocean"
+  ) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text = element_text(size = 14),
+    panel.border = element_rect(color = "black", fill = NA, size = 1)  ,
+    panel.background = element_rect(fill = "white", color = NA),  
+    plot.background = element_rect(fill = "white", color = NA),  
+    panel.grid.major = element_blank(),  
+    panel.grid.minor = element_blank()  
+  )+
+  theme( axis.line = element_line(color = "black"),  
+    legend.position = "none")
+
+ggsave(SFIG_4_1,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_4_1.tif", width =3, height = 4,units = "in",dpi = 600 )
+ggsave(SFIG_4_1,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_4_1.pdf", width =3, height = 4,units = "in",dpi = 600 )
+
+```
+
+```{r}
+cor.test(sample_temp5$depth,sample_temp5$sample_all_member,data=sample_temp5,         
+         alternative = "two.sided",         
+         method ="pearson",
+         conf.level=0.95)
+SFIG_4_2 <- ggplot(sample_temp5, aes(x = depth, y = sample_all_member, color = Ocean)) +
+  geom_point(alpha = 0.6, size = 3, stroke = 0) +  
+  geom_smooth(method = "lm", se = TRUE, color = "black", fill = "grey") +  
+  labs(x = "depth", y = "sample_all_member",title = " sample_temp5$depth") +
+  theme_minimal()+
+  geom_rug( show.legend = F)+
+    geom_rug( show.legend = F)+
+    scale_color_manual(
+    values = c("Antarctic_Ocean" = "#1B6EB7", "Arctic_Ocean" = "#0B3994", "Indian" = "#BE93C2", 
+               "NAtlantic" = "#BFDAA5", "NPacific" = "#F2BB1C", "RS" = "#AF2224", 
+               "SAtlantic" = "#7DB44C", "SPacific" = "#D48222"),
+    name = "Ocean"
+  ) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold"),
+    axis.title.x = element_text(size = 14),
+    axis.title.y = element_text(size = 14),
+    axis.text = element_text(size = 14),
+    panel.border = element_rect(color = "black", fill = NA, size = 1)  ,
+    panel.background = element_rect(fill = "white", color = NA),  
+    plot.background = element_rect(fill = "white", color = NA),   
+    panel.grid.major = element_blank(), 
+    panel.grid.minor = element_blank()  
+  )+
+  theme( axis.line = element_line(color = "black"),  
+    legend.position = "none")
+
+ggsave(SFIG_4_2,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_4_2.tif", width =3, height = 4,units = "in",dpi = 600 )
+ggsave(SFIG_4_2,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_4_2.pdf", width =3, height = 4,units = "in",dpi = 600 )
+```
+
+# S5
+
+```{r}
+most_wanted_clu <- clu_table %>% filter(family_know == "unknow")
+most_wanted_summary <- most_wanted_clu %>%
+  group_by(EC_1) %>%
+  summarise(number <- n_distinct(ref_clu))
+colnames(most_wanted_summary)[2] <- "clu_number"
+
+library(treemapify)
+library(RColorBrewer)
+
+SFIG_5 <- ggplot(most_wanted_summary, aes(area = `clu_number`, fill = `clu_number`, label = EC_1)) +
+  geom_treemap() +
+  geom_treemap_text(colour = "white", place = "centre", size = 15) +
+  scale_fill_gradient(low = "#708FBA", high = "#D06D60")
+
+
+ggsave(SFIG_5,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_5.tif", width =5, height = 4,units = "in",dpi = 600 )
+ggsave(SFIG_5,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_5.pdf", width =5, height = 4,units = "in",dpi = 600 )
+```
+
+# S6
+
+```{r}
+SFIG_6_1 <- ggplot(sample_table, aes(y = Ocean, x = family_unknow_member_pro, fill = Ocean)) +
+  geom_boxplot(color = "black", outlier.shape = NA, alpha = 1) +  
+  geom_boxplot(data = all_samples_summary, 
+               aes(y = Ocean, x = family_unknow_member_pro), 
+               color = "black", 
+               fill = "#cce4ef",  
+               alpha = 1) + 
+  labs(title = "", x = "Most_wanted_member_pro", y = "") +
+  theme_minimal() +
+  scale_fill_manual(
+    values = c("Antarctic_Ocean" ="#5dbfe9","Arctic_Ocean"="#0B3994","Indian"="#BE93C2","NAtlantic"="#BFDAA5","NPacific"="#F2BB1C","RS"="#AF2224","SAtlantic"="#7DB44C","SPacific"="#D48222"),
+    name = "Ocean" 
+  ) +
+  scale_x_reverse() +
+  theme(
+    axis.text.y = element_text(angle = 0, hjust = 1, size = 10),  
+    plot.title = element_text(size = 10, face = "bold"),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+    panel.background = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  theme(legend.position = "none") +
+  theme(axis.line = element_line(color = "black"))
+
+```
+
+```{r}
+SFIG_6_2 <- ggplot(sample_table, aes(y = Ocean, x = family_unknow_pro, fill = Ocean)) +
+  geom_boxplot(color = "black", outlier.shape = NA, alpha = 1) +  
+  geom_boxplot(data = all_samples_summary, 
+               aes(y = Ocean, x = family_unknow_pro), 
+               color = "black", 
+               fill = "#cce4ef",
+               alpha = 1) + 
+  labs(title = "", x = "Most wanted cluster_pro", y = "") +
+  theme_minimal() +
+  scale_fill_manual(
+    values = c("Antarctic_Ocean" ="#5dbfe9","Arctic_Ocean"="#0B3994","Indian"="#BE93C2","NAtlantic"="#BFDAA5","NPacific"="#F2BB1C","RS"="#AF2224","SAtlantic"="#7DB44C","SPacific"="#D48222"),
+    name = "Ocean" 
+  ) +
+  theme(
+    axis.text.y = element_text(angle = 0, hjust = 1, size = 10),  # Adjust text angle for the y-axis
+    plot.title = element_text(size = 10, face = "bold"),
+    axis.title.x = element_text(size = 10),
+    axis.title.y = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10),
+    panel.border = element_rect(color = "black", fill = NA, size = 0.5),
+    panel.background = element_blank(),
+    plot.background = element_rect(fill = "white", color = NA),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  theme(legend.position = "none") +
+  theme(axis.line = element_line(color = "black"))
+
+SFIG_6 <- SFIG_6_1+SFIG_6_2
+
+ggsave(SFIG_6,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_6.tif", width =10, height = 7,units = "in",dpi = 600 )
+ggsave(SFIG_6,filename = "F:/SDU/Eworking/one/life history/论文写作_海洋酶纯数据计算/短文图/SFIG//SFIG_6.pdf", width =10, height = 7,units = "in",dpi = 600 )
+```
